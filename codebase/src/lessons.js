@@ -1,0 +1,42 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { redactPii } from './privacy.js';
+
+const FILE_RE = /^(\d{2})\.(\d{2})\.(\d{4})-([^\\/]+)\.pdf$/iu;
+
+function dateKey(date, timeZone = 'Asia/Ho_Chi_Minh') {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, day: '2-digit', month: '2-digit', year: 'numeric',
+  }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return `${get('day')}.${get('month')}.${get('year')}`;
+}
+
+export function findLessonPdf(directory, date, timeZone) {
+  if (!fs.existsSync(directory)) return null;
+  const wanted = dateKey(date, timeZone);
+  const matches = fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && FILE_RE.test(entry.name) && entry.name.startsWith(`${wanted}-`));
+  if (matches.length !== 1) return null;
+  const resolvedDir = path.resolve(directory);
+  const filePath = path.resolve(resolvedDir, matches[0].name);
+  if (!filePath.startsWith(`${resolvedDir}${path.sep}`)) throw new Error('Đường dẫn PDF không an toàn');
+  return filePath;
+}
+
+export async function readFirstPage(filePath) {
+  const bytes = new Uint8Array(fs.readFileSync(filePath));
+  const pdf = await getDocument({ data: bytes, disableFontFace: true, useSystemFonts: false }).promise;
+  try {
+    const page = await pdf.getPage(1);
+    const content = await page.getTextContent();
+    return redactPii(content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim()).slice(0, 12000);
+  } finally {
+    await pdf.destroy();
+  }
+}
+
+export function dayDates(now = new Date()) {
+  return { today: now, yesterday: new Date(now.getTime() - 24 * 60 * 60 * 1000) };
+}

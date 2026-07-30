@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
+import { redactPii } from './privacy.js';
 
 export const PARTS = Object.freeze({
   'sang-bai-toan': { file: 'transcript-01-clean.md', prefix: 'T01', label: 'Day 2 sáng — Xác định bài toán' },
@@ -18,7 +19,7 @@ export function loadPart(key) {
   const raw = fs.readFileSync(filePath, 'utf8');
   const chunks = [...raw.matchAll(CHUNK_RE)].map((m) => ({ code: m[1], text: m[2].replace(/\s+/g, ' ').trim() }));
   if (!chunks.length || chunks.some((c) => !c.code.startsWith(part.prefix))) throw new Error('Transcript sai định dạng');
-  const context = chunks.map((c) => `[${c.code}] ${c.text}`).join('\n');
+  const context = redactPii(chunks.map((c) => `[${c.code}] ${c.text}`).join('\n'));
   return { ...part, chunks, context: context.slice(0, config.maxContextChars), truncated: context.length > config.maxContextChars };
 }
 
@@ -30,4 +31,3 @@ export function validateCitations(result, part, validCodes) {
     point.citations.every((code) => code.startsWith(part.prefix) && validCodes.has(code))
   );
 }
-

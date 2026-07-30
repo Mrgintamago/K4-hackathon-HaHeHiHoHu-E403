@@ -4,3 +4,10 @@ venv/
 logs/
 data-private/
 *.log
+pdf/
+*.pdf
+*thông-báo*.txt
+*thông báo*.txt
+AI20K Build Phase*.txt
+feedback.jsonl
+$VIRTUAL_ENV/

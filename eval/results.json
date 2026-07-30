@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-07-30T16:30:00+07:00",
+  "automated_tests": 14,
+  "passed": 14,
+  "failed": 0,
+  "golden_set_total": 20,
+  "golden_set_evaluated": 0,
+  "live_ai_smoke_run": true,
+  "live_ai_smoke_passed": true,
+  "quality_bar_met": null,
+  "note": "Automated tests and one synthetic live smoke passed; the 20-case golden set has not been run end-to-end."
+}

@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "deploy": "node src/deploy-commands.js",
     "start": "node src/bot.js",
-    "test": "node --test --test-isolation=none"
+    "test": "node --test --test-isolation=none",
+    "eval": "node scripts/eval-runner.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "pdfjs-dist": "^5.7.284"
   }
 }

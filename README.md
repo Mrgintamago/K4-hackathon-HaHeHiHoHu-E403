@@ -1,6 +1,6 @@
 # HaHeHiHoHu — Discord Bot tóm tắt Day 2
 
-Prototype hackathon: slash command `/tomtat-day2` tóm tắt ba phần transcript Day 2 và trả kết quả có citation `[T01-NNN]`, `[T02-NNN]`, `[T03-NNN]`.
+Prototype hackathon: mention bot để hỏi lịch và nội dung bài học từ PDF private; bot gửi reminder học tập và standup vào channel cá nhân.
 
 ## Thành viên và phân công
 
@@ -135,13 +135,58 @@ ALLOWED_ROLE_IDS=333333333333333333,444444444444444444
 
 Để `ALLOWED_ROLE_IDS` trống nếu mọi thành viên trong guild đều được gọi bot. Nên deny thêm `View Channel` cho bot role tại các channel nhạy cảm để có hai lớp bảo vệ. Kiểm tra trong code diễn ra trước khi đọc transcript hoặc gọi OpenAI nên request bị chặn không tốn token AI.
 
-## Command
+## Hỏi bằng mention và nhắc học lúc 08:00
+
+Bot có thể trả lời câu hỏi có căn cứ từ transcript khi được mention, ví dụ `@tenbot tóm tắt phần MVP`. Câu trả lời là diễn giải, không trích nguyên văn. Bot che email, số điện thoại, Discord ID và mention trước khi gửi nội dung tới AI. Tính năng chỉ hoạt động trong `MENTION_ALLOWED_CHANNEL_IDS`.
+
+Reminder lúc 08:00 theo `REMINDER_TIMEZONE` gồm bài hôm qua, bài hôm nay và lịch Workshop/Office hours/Mentor duty hôm nay. PDF bài học phải nằm ngoài repo trong `LESSON_PDF_DIR`, có đúng một file mỗi ngày theo mẫu:
 
 ```text
-/tomtat-day2 phan:sang-bai-toan muc_do:ngan
-/tomtat-day2 phan:chi-so-tu-dong-hoa muc_do:ngan
-/tomtat-day2 phan:chieu-rang-buoc muc_do:day-du
+30.07.2026-thu-nam.pdf
 ```
+
+Bot xác định ngày bằng phần `dd.mm.yyyy`, chỉ đọc trang đầu tại chỗ và không sao chép PDF. Text trang đầu được che PII trước khi gửi tới OpenAI với `store: false`. File sai tên hoặc có nhiều file trùng ngày sẽ không được đoán tự động.
+
+Lịch được đọc từ `DISCORD_ANNOUNCEMENT_CHANNEL_ID`. Chỉ tin nhắn của thành viên có một trong các `DISCORD_MANAGER_ROLE_IDS` mới được dùng. Dùng ID thay vì tên channel/role.
+
+Trong Discord Developer Portal, bật **Message Content Intent**. Bot chỉ cần quyền View Channel, Read Message History, Send Messages, Embed Links và Use Application Commands tại các channel được phép; không cấp Administrator.
+
+```env
+ENABLE_MENTION_QA=true
+MENTION_ALLOWED_CHANNEL_IDS=111111111111111111
+ENABLE_DAILY_REMINDER=true
+DISCORD_ANNOUNCEMENT_CHANNEL_ID=222222222222222222
+DISCORD_REMINDER_CHANNEL_ID=333333333333333333
+DISCORD_MANAGER_ROLE_IDS=444444444444444444
+REMINDER_HOUR=8
+REMINDER_MINUTE=0
+REMINDER_TIMEZONE=Asia/Ho_Chi_Minh
+LESSON_PDF_DIR=../pdf
+```
+
+Không commit PDF, export Discord hoặc dữ liệu runtime. Nếu một file nhạy cảm từng được Git theo dõi, `.gitignore` không xóa file đó khỏi lịch sử.
+
+### Daily Standup theo team
+
+Mỗi team được map trực tiếp tới channel chứa thông báo standup. Bot không đọc channel thảo luận. Lúc 12:00, bot lấy standup mới nhất trong ngày của mỗi user có đúng tiêu đề `✅ Stand-up đã ghi nhận`, parse `Hôm qua`, `Hôm nay`, `Blocker` và gửi card có nút `Đã làm`, `Chưa xong`, `Có blocker`.
+
+```env
+ENABLE_STANDUP_REMINDER=true
+TEAM_STANDUP_CHANNEL_MAP=T203:111111111111111111,T204:222222222222222222
+STANDUP_REMINDER_HOUR=21
+STANDUP_REMINDER_MINUTE=30
+STANDUP_MANAGER_ROLE_IDS=444444444444444444
+```
+
+Chỉ user của standup hoặc manager được cập nhật nút. Bot không gửi nội dung này tới AI và không lưu raw standup; state runtime chỉ chứa ngày, Discord user ID và trạng thái.
+
+Mọi reminder được chuyển tới channel cá nhân theo user ID:
+
+```env
+USER_PERSONAL_CHANNEL_MAP=123456789012345678:333333333333333333
+```
+
+Bot không đăng ký slash command. User hỏi lịch hoặc nội dung PDF bằng cách mention bot trong channel được allowlist.
 
 ## Docker
 

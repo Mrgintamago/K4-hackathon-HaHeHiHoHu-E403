@@ -1,40 +1,77 @@
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { assertEnv, config } from './config.js';
-import { loadPart, validateCitations } from './transcripts.js';
-import { summarize } from './ai.js';
-import { acquire, authorize, release } from './security.js';
+import { answerFromLearningSources } from './ai.js';
+import { acquire, release } from './security.js';
+import { safeQuestion } from './privacy.js';
+import { startDailyReminder } from './reminders.js';
+import { handleStandupButton, startStandupReminder } from './standups.js';
+import { findLessonPdf, readFirstPage } from './lessons.js';
+import { fetchDailyEvents } from './announcements.js';
+import { acquireInstanceLock } from './single-instance.js';
 
+acquireInstanceLock();
 assertEnv();
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const intents = [GatewayIntentBits.Guilds];
+if (config.mentionQaEnabled) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
+const client = new Client({ intents });
 
-client.once(Events.ClientReady, (bot) => console.log(`Bot online: ${bot.user.tag}`));
+function requestedDate(question) {
+  const explicit = question.match(/\b(\d{2})[./-](\d{2})[./-](\d{4})\b/);
+  if (explicit) return new Date(`${explicit[3]}-${explicit[2]}-${explicit[1]}T12:00:00+07:00`);
+  const offset = /hôm qua/i.test(question) ? -1 : /ngày mai/i.test(question) ? 1 : 0;
+  return new Date(Date.now() + offset * 86_400_000);
+}
+
+function dateKey(date) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: config.reminderTimezone, day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(date).replaceAll('/', '.');
+}
+
+client.once(Events.ClientReady, (bot) => {
+  console.log(`Bot online: ${bot.user.tag}`);
+  if (config.dailyReminderEnabled) startDailyReminder(client);
+  if (config.standupEnabled) startStandupReminder(client);
+});
+
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== 'tomtat-day2') return;
-  const denied = authorize(interaction);
-  if (denied) return interaction.reply({ content: denied, ephemeral: true });
-  const lock = acquire(interaction.user.id);
-  if (!lock.ok) return interaction.reply({ content: lock.message, ephemeral: true });
-  await interaction.deferReply({ ephemeral: true });
+  try { await handleStandupButton(interaction); } catch { console.error('standup_button_failed'); }
+});
 
+client.on(Events.MessageCreate, async (message) => {
+  if (!config.mentionQaEnabled || message.author.bot || message.guildId !== config.discord.guildId) return;
+  if (!message.mentions.users.has(client.user.id)) return;
+  if (config.discord.deniedChannelIds.has(message.channelId)) return;
+  if (!config.discord.mentionAllowedChannelIds.has(message.channelId)) return;
+  if (config.discord.allowedRoleIds.size && !message.member?.roles?.cache?.some((role) => config.discord.allowedRoleIds.has(role.id))) return;
+  const lock = acquire(message.author.id);
+  if (!lock.ok) return message.reply(lock.message);
   try {
-    const key = interaction.options.getString('phan', true);
-    const detail = interaction.options.getString('muc_do', true);
-    const part = loadPart(key);
-    const result = await summarize(part, detail);
-    const validCodes = new Set(part.chunks.map((c) => c.code));
-    if (!validateCitations(result, part, validCodes)) throw new Error('citation_validation_failed');
-    const points = result.key_points.map((p, i) => `${i + 1}. ${p.text}\n   Nguồn: ${p.citations.map((c) => `[${c}]`).join(', ')}`).join('\n\n');
-    const actions = Array.isArray(result.actions) && result.actions.length ? `\n\n✅ Gợi ý ôn tập:\n${result.actions.slice(0, 3).map((x) => `- ${String(x).slice(0, 300)}`).join('\n')}` : '';
-    const warning = part.truncated ? '\n\n⚠️ Nguồn dài đã được giới hạn context.' : '';
-    await interaction.editReply(`📚 **${String(result.title || part.label).slice(0, 150)}**\n\n${points}${actions}${warning}`.slice(0, 1950));
-  } catch (error) {
-    // Chỉ log mã lỗi, không log prompt, transcript, token hay raw response.
-    console.error('summary_failed', error?.name || 'Error', error?.message === 'citation_validation_failed' ? 'citation_validation_failed' : 'provider_or_config_error');
-    await interaction.editReply('Không thể tạo bản tóm tắt có căn cứ lúc này. Bot đã chặn kết quả để tránh gửi nội dung hoặc citation không đáng tin.');
-  } finally {
-    release(interaction.user.id);
-  }
+    const question = safeQuestion(message.content, client.user.id);
+    if (!question) return await message.reply('Bạn hãy hỏi về lịch hoặc nội dung PDF bài học.');
+    const date = requestedDate(question);
+    const sourceParts = [];
+    const asksWorkshop = /workshop|\bws\b/i.test(question);
+    const asksLesson = /bài|học|pdf|hôm nay|hôm qua/i.test(question) && !asksWorkshop;
+    if (asksLesson || !asksWorkshop) {
+      const pdf = findLessonPdf(config.lessonPdfDir, date, config.reminderTimezone);
+      if (pdf) sourceParts.push(`Nội dung bài học ngày ${dateKey(date)}:\n${await readFirstPage(pdf)}`);
+    }
+    if (asksWorkshop && config.discord.announcementChannelId) {
+      try {
+        const channel = await client.channels.fetch(config.discord.announcementChannelId);
+        const events = channel?.isTextBased()
+          ? await fetchDailyEvents(channel, config.discord.managerRoleIds, dateKey(date)) : [];
+        const workshops = events.filter((event) => event.type === 'Workshop');
+        if (workshops.length) sourceParts.push(`Nội dung/mô tả Workshop ngày ${dateKey(date)}:\n${workshops.map((e) => e.description).join('\n')}`);
+      } catch { console.error('announcement_read_failed'); }
+    }
+    const answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
+    await message.reply({ content: answer, allowedMentions: { repliedUser: false, parse: [] } });
+  } catch {
+    console.error('mention_qa_failed');
+    await message.reply('Mình chưa thể đọc lịch hoặc PDF có căn cứ lúc này.');
+  } finally { release(message.author.id); }
 });
 
 client.login(config.discord.token);
-
