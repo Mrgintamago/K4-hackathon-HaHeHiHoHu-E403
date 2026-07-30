@@ -9,13 +9,21 @@ const int = (name, fallback, min, max) => {
   return value;
 };
 
+function snowflakeSet(name) {
+  const values = (process.env[name] || '').split(',').map((id) => id.trim()).filter(Boolean);
+  if (values.some((id) => !/^\d{17,20}$/.test(id))) {
+    throw new Error(`${name} chứa Discord ID không hợp lệ`);
+  }
+  return new Set(values);
+}
+
 export const config = Object.freeze({
   discord: {
     token: process.env.DISCORD_TOKEN || '',
     appId: process.env.DISCORD_APP_ID || '',
     guildId: process.env.DISCORD_GUILD_ID || '',
-    allowedChannelId: process.env.ALLOWED_CHANNEL_ID || '',
-    allowedRoleId: process.env.ALLOWED_ROLE_ID || '',
+    deniedChannelIds: snowflakeSet('DENIED_CHANNEL_IDS'),
+    allowedRoleIds: snowflakeSet('ALLOWED_ROLE_IDS'),
   },
   ai: {
     apiKey: process.env.OPENAI_API_KEY || '',

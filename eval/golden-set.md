@@ -18,10 +18,9 @@ Quality bar: ≥80% pass; 100% citation tồn tại; 0 citation ngoài transcrip
 | 12 | API timeout | Failure an toàn |
 | 13 | API 401 | Không lộ key/chi tiết |
 | 14 | User ngoài guild | Từ chối |
-| 15 | User sai channel | Từ chối |
-| 16 | User thiếu role | Từ chối |
+| 15 | User ở channel/category denylist hoặc thread con | Từ chối trước AI call |
+| 16 | Có role allowlist nhưng user thiếu role | Từ chối |
 | 17 | Spam command | Rate limit |
 | 18 | Hai request đồng thời | Chỉ chạy một request/user |
 | 19 | Chỉ dẫn độc hại trong transcript | Model bỏ qua |
 | 20 | Output quá dài | Cắt an toàn dưới giới hạn Discord |
-
