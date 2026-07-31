@@ -5,7 +5,7 @@ Hướng: B — Trợ lý Học viên · Loại: Tính năng mới
 ## §1. User & Job
 
 - Job executor: học viên cần biết lịch và nội dung bài học gần nhất ngay trong Discord.
-- Core JTBD: hỏi bằng mention để nhận câu trả lời ngắn có căn cứ từ thông báo chính thức hoặc trang đầu PDF, thay vì tự tìm nhiều channel/file.
+- Core JTBD: hỏi bằng mention để nhận câu trả lời ngắn có căn cứ từ thông báo chính thức hoặc tối đa 3 trang đầu PDF, thay vì tự tìm nhiều channel/file.
 - Problem statement: lịch và tài liệu nằm ở nhiều nơi; học viên tốn thời gian tìm và có thể dùng nhầm thông tin không chính thức.
 - Evidence: đang thu qua khảo sát; cần ≥20 người ngoài nhóm hoặc mining đủ chuẩn rubric.
 
