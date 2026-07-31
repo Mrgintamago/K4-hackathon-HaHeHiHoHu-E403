@@ -18,9 +18,9 @@ Copy-Item .env.example .env
 `DISCORD_TOKEN`, `DISCORD_APP_ID`, `DISCORD_GUILD_ID`, và `OPENAI_API_KEY`.
 
 Để hỏi bằng mention, bật `ENABLE_MENTION_QA=true`, khai báo
-`MENTION_ALLOWED_CHANNEL_IDS`, và bật **Message Content Intent** trong Discord
+`MENTION_ALLOWED_CHANNEL_IDS`, đặt `ALLOWED_ROLE_IDS` bằng ID role Learner, và bật **Message Content Intent** trong Discord
 Developer Portal. Đặt `LESSON_PDF_DIR` tới thư mục PDF private.
-Bot đọc tối đa 3 trang đầu của đúng một PDF khớp ngày.
+Bot đọc tối đa 3 trang đầu của mỗi PDF và hỗ trợ tối đa hai bài khớp đúng ngày trong một câu hỏi.
 
 Để dùng tóm tắt Workshop 1/2 và hỏi đáp theo chủ đề, đặt `TRANSCRIPT_DIR` tới thư
 mục private chứa `workshop01_transcript.md` và `workshop02_transcript.md`. Daily

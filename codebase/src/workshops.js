@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
 import { redactPii } from './privacy.js';
+import { hasDateReference } from './query-intents.js';
 
 export const WORKSHOPS = Object.freeze({
   1: { number: 1, file: 'workshop01_transcript.md', prefix: 'WS1', label: 'Workshop 1' },
@@ -94,18 +95,92 @@ function fitChunks(chunks, maxChars, terms = [], chunkMax = 1800) {
   return result.join('\n');
 }
 
-export function buildWorkshopSummarySource(workshop, maxChars = 18000) {
-  const content = workshop.contentChunks;
-  const target = Math.min(28, content.length);
-  const sampled = [];
-  for (let i = 0; i < target; i += 1) {
-    const index = Math.floor(i * content.length / target);
-    if (content[index] && sampled.at(-1) !== content[index]) sampled.push(content[index]);
+function splitWorkshopChunks(chunks, maxLength = 560) {
+  const segments = [];
+  for (const chunk of chunks) {
+    let remaining = String(chunk.text || '').replace(/\s+/g, ' ').trim();
+    while (remaining) {
+      if (remaining.length <= maxLength) {
+        segments.push({ code: chunk.code, text: remaining });
+        break;
+      }
+      const space = remaining.lastIndexOf(' ', maxLength);
+      const cut = space >= Math.floor(maxLength * 0.65) ? space : maxLength;
+      segments.push({ code: chunk.code, text: remaining.slice(0, cut).trim() });
+      remaining = remaining.slice(cut).trim();
+    }
   }
-  const questions = workshop.qaChunks.filter((chunk) => QUESTION_RE.test(chunk.text)).slice(0, 6);
-  const main = fitChunks(sampled, Math.floor(maxChars * 0.72), [], 650);
-  const qa = fitChunks(questions, maxChars - main.length - 50, ['hỏi', 'câu hỏi'], 900);
+  return segments.filter((segment) => segment.text.length >= 30);
+}
+
+function representativeSegments(segments, target) {
+  if (segments.length <= target) return segments;
+  const selected = [];
+  for (let index = 0; index < target; index += 1) {
+    const from = Math.floor(index * segments.length / target);
+    const to = Math.max(from + 1, Math.floor((index + 1) * segments.length / target));
+    const best = segments.slice(from, to).reduce((winner, segment) => {
+      const score = keywords(segment.text).length + Math.min(segment.text.length, 560) / 100;
+      return score > winner.score ? { segment, score } : winner;
+    }, { segment: null, score: -1 });
+    if (best.segment) selected.push(best.segment);
+  }
+  return selected;
+}
+
+export function buildWorkshopSummarySource(workshop, maxChars = 12000) {
+  const contentSegments = splitWorkshopChunks(workshop.contentChunks);
+  const sampled = representativeSegments(contentSegments, Math.min(20, contentSegments.length));
+  const qaSegments = splitWorkshopChunks(workshop.qaChunks);
+  const selectedQa = new Map();
+  const questionIndexes = qaSegments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => QUESTION_RE.test(segment.text) || segment.text.includes('?'))
+    .slice(0, 3);
+  for (const { index } of questionIndexes) {
+    for (let offset = 0; offset < 3 && index + offset < qaSegments.length; offset += 1) {
+      selectedQa.set(index + offset, qaSegments[index + offset]);
+    }
+  }
+  const main = fitChunks(sampled, Math.floor(maxChars * 0.68), [], 600);
+  const qa = fitChunks([...selectedQa.values()], maxChars - main.length - 50, ['hỏi', 'câu hỏi'], 600);
   return `${main}\n\n<CÂU_HỎI_CUỐI_BUỔI>\n${qa || 'Không nhận diện được câu hỏi.'}`.slice(0, maxChars);
+}
+
+function localPoint(text, maxLength = 180) {
+  const safe = redactPii(text).replace(/\s+/g, ' ').trim();
+  if (safe.length <= maxLength) return safe;
+  const clipped = safe.slice(0, maxLength + 1);
+  const sentenceEnd = Math.max(clipped.lastIndexOf('. '), clipped.lastIndexOf('? '), clipped.lastIndexOf('! '));
+  return `${clipped.slice(0, sentenceEnd >= 80 ? sentenceEnd + 1 : maxLength).trim()}…`;
+}
+
+export function buildLocalWorkshopFallback(workshop, qaSource = '') {
+  if (qaSource) {
+    const excerpts = qaSource.split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^\[WS[12]-\d{3}\]/.test(line))
+      .slice(0, 2)
+      .map((line) => `• ${localPoint(line, 260)}`);
+    if (excerpts.length) return `**${workshop.label} — hỏi đáp từ transcript**\n${excerpts.join('\n')}`;
+  }
+
+  const segments = splitWorkshopChunks(workshop.contentChunks, 360);
+  const selected = representativeSegments(segments, Math.min(3, segments.length));
+  const points = selected.map((chunk) => `• ${localPoint(chunk.text, 140)} [${chunk.code}]`);
+  if (!points.length) return '';
+  const qaSegments = splitWorkshopChunks(workshop.qaChunks, 280);
+  const questionIndex = qaSegments.findIndex((segment) =>
+    QUESTION_RE.test(segment.text) || segment.text.includes('?'));
+  const qa = questionIndex >= 0
+    ? qaSegments.slice(questionIndex, questionIndex + 2)
+      .map((segment, index) => `• ${index ? 'Ý trả lời: ' : ''}${localPoint(segment.text, 120)} [${segment.code}]`)
+    : [];
+  return [
+    `**${workshop.label} — kiến thức chính**`,
+    ...points,
+    ...(qa.length ? ['', '**Hỏi đáp đáng chú ý**', ...qa] : []),
+  ].join('\n');
 }
 
 export function findWorkshopQaSource(workshop, query, maxChars = 14000) {
@@ -133,6 +208,14 @@ export function findWorkshopQaSource(workshop, query, maxChars = 14000) {
 export function workshopNumbersFromText(value) {
   const matches = [...String(value || '').matchAll(/\b(?:workshop|w[\s._-]*s)[\s._-]*0?([12])\b/gi)];
   return [...new Set(matches.map((match) => Number(match[1])))];
+}
+
+export function workshopNumbersForContent(value, announcedNumbers = []) {
+  const requested = workshopNumbersFromText(value);
+  if (requested.length) return requested;
+  const announced = [...new Set(announcedNumbers.filter((number) => WORKSHOPS[number]))];
+  if (announced.length) return announced;
+  return hasDateReference(value) ? [] : Object.keys(WORKSHOPS).map(Number);
 }
 
 export function isWorkshopQuery(value) {

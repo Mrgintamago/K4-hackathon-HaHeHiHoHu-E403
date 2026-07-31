@@ -25,6 +25,25 @@ export function findLessonPdf(directory, date, timeZone) {
   return filePath;
 }
 
+export function listLessonPdfs(directory) {
+  if (!fs.existsSync(directory)) return [];
+  const resolvedDir = path.resolve(directory);
+  return fs.readdirSync(resolvedDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && FILE_RE.test(entry.name))
+    .map((entry) => {
+      const filePath = path.resolve(resolvedDir, entry.name);
+      if (!filePath.startsWith(`${resolvedDir}${path.sep}`)) throw new Error('Đường dẫn PDF không an toàn');
+      return filePath;
+    })
+    .sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+}
+
+export function lessonDateForPdf(filePath) {
+  const match = path.basename(filePath).match(FILE_RE);
+  if (!match) return null;
+  return new Date(`${match[3]}-${match[2]}-${match[1]}T12:00:00+07:00`);
+}
+
 export function lessonLinkForPdf(filePath, listPath = path.join(path.dirname(filePath), 'list.md')) {
   const match = path.basename(filePath).match(FILE_RE);
   if (!match || !fs.existsSync(listPath)) return '';

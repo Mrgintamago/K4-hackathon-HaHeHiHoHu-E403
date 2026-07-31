@@ -1,20 +1,37 @@
 import { Client, Events, GatewayIntentBits, PermissionFlagsBits } from 'discord.js';
 import { assertEnv, config } from './config.js';
-import { answerFromLearningSources } from './ai.js';
+import { answerFromLearningSources, summarizeWorkshop } from './ai.js';
 import { acquire, release } from './security.js';
 import { safeQuestion } from './privacy.js';
 import { localLessonSummary, startDailyReminder } from './reminders.js';
 import { handleStandupButton, startStandupReminder } from './standups.js';
-import { findLessonPdf, lessonLinkForPdf, lessonNumberForPdf, readFirstPages } from './lessons.js';
+import {
+  findLessonPdf,
+  lessonDateForPdf,
+  lessonLinkForPdf,
+  lessonNumberForPdf,
+  listLessonPdfs,
+  readFirstPages,
+} from './lessons.js';
 import { fetchDailyEvents, fetchWeeklyEvents } from './announcements.js';
 import { acquireInstanceLock } from './single-instance.js';
-import { classifyQuery, LESSON_PATTERN, requestedDate, SCHEDULE_PATTERN } from './query-intents.js';
 import {
+  classifyQuery,
+  dateReferenceCount,
+  hasAmbiguousDateReference,
+  requestedDate,
+  requestedLessonDates,
+  requestsAllLessons,
+  SCHEDULE_PATTERN,
+} from './query-intents.js';
+import {
+  buildLocalWorkshopFallback,
   buildWorkshopSummarySource,
   findWorkshopQaSource,
   isWorkshopQuery,
   loadWorkshop,
   WORKSHOPS,
+  workshopNumbersForContent,
   workshopNumbersFromText,
 } from './workshops.js';
 
@@ -67,7 +84,7 @@ client.on(Events.MessageCreate, async (message) => {
     return;
   }
   if (config.discord.allowedRoleIds.size && !message.member?.roles?.cache?.some((role) => config.discord.allowedRoleIds.has(role.id))) {
-    await accessNotice(message, 'role', 'Bạn chưa có quyền sử dụng trợ lý trong channel này. Nếu cần hỗ trợ, hãy liên hệ quản lý lớp.');
+    await accessNotice(message, 'role', 'Chỉ thành viên có role Learner mới được sử dụng trợ lý.');
     return;
   }
   const lock = acquire(message.author.id);
@@ -80,24 +97,67 @@ client.on(Events.MessageCreate, async (message) => {
     if (!question) return await message.reply('Bạn hãy hỏi về lịch hoặc nội dung PDF bài học.');
     const sourceParts = [];
     const announcedWorkshopNumbers = [];
+    const workshopSummaryTargets = [];
     const asksWorkshop = isWorkshopQuery(question);
     const { asksLesson, asksSchedule, asksWeeklySchedule } = classifyQuery(question);
-    const lessonDate = requestedDate(question, LESSON_PATTERN);
+    const requestsLessonContent = asksLesson || (!asksWorkshop && !asksSchedule);
+    if (requestsLessonContent && hasAmbiguousDateReference(question)) {
+      return await message.reply('Mình chưa xác định được ngày bài học. Bạn hãy ghi một ngày cụ thể theo dạng dd/mm/yyyy.');
+    }
+    const lessonDates = requestsLessonContent ? requestedLessonDates(question) : [];
+    if (lessonDates.length > 2) {
+      return await message.reply('Bạn có thể yêu cầu tối đa hai bài học trong mỗi câu hỏi.');
+    }
+    if (lessonDates.some((date) => !date)) {
+      return await message.reply('Ngày bài học bạn hỏi không hợp lệ. Hãy ghi ngày theo dạng dd/mm/yyyy.');
+    }
     const scheduleDate = requestedDate(question, SCHEDULE_PATTERN);
+    if (asksSchedule && !scheduleDate) {
+      return await message.reply('Ngày lịch bạn hỏi không hợp lệ. Hãy ghi ngày theo dạng dd/mm/yyyy.');
+    }
     const groundedFallbackParts = [];
-    let lessonLink = '';
-    let lessonNumber = null;
-    if (asksLesson || (!asksWorkshop && !asksSchedule)) {
-      const pdf = findLessonPdf(config.lessonPdfDir, lessonDate, config.reminderTimezone);
-      if (pdf) {
-        lessonNumber = lessonNumberForPdf(pdf);
-        const lessonLabel = lessonNumber ? `Ngày học ${lessonNumber}, ngày ${dateKey(lessonDate)}` : `Bài học ngày ${dateKey(lessonDate)}`;
-        const firstPages = await readFirstPages(pdf);
-        sourceParts.push(`${lessonLabel} — nội dung 3 trang đầu:\n${firstPages}`);
-        groundedFallbackParts.push(`**${lessonLabel}**\n${localLessonSummary(firstPages)} _(tóm tắt cục bộ)_`);
-        lessonLink = lessonLinkForPdf(pdf);
+    const lessonAppendices = [];
+    let foundLessons = 0;
+    let missingLessons = 0;
+    if (requestsLessonContent) {
+      let lessonTargets;
+      if (requestsAllLessons(question) && dateReferenceCount(question) === 0) {
+        const files = listLessonPdfs(config.lessonPdfDir);
+        const dates = files.map(lessonDateForPdf);
+        if (files.length !== 2 || dates.some((date) => !date)
+          || new Set(dates.map((date) => dateKey(date))).size !== 2) {
+          return await message.reply('Mình chưa xác định được đúng hai bài. Bạn hãy ghi rõ hai ngày cần tóm tắt.');
+        }
+        lessonTargets = files.map((pdf, index) => ({ date: dates[index], pdf }));
       } else {
-        console.error('lesson_not_found', dateKey(lessonDate), config.lessonPdfDir);
+        lessonTargets = lessonDates.map((date) => ({
+          date,
+          pdf: findLessonPdf(config.lessonPdfDir, date, config.reminderTimezone),
+        }));
+      }
+      for (const { date: lessonDate, pdf } of lessonTargets) {
+        const lessonDateKey = dateKey(lessonDate);
+        if (pdf) {
+          foundLessons += 1;
+          const lessonNumber = lessonNumberForPdf(pdf);
+          const lessonLabel = lessonNumber
+            ? `Ngày học ${lessonNumber}, ngày ${lessonDateKey}`
+            : `Bài học ngày ${lessonDateKey}`;
+          const firstPages = await readFirstPages(pdf);
+          sourceParts.push(`${lessonLabel} — nội dung 3 trang đầu:\n${firstPages}`);
+          groundedFallbackParts.push(`**${lessonLabel}**\n${localLessonSummary(firstPages)} _(tóm tắt cục bộ)_`);
+          const lessonLink = lessonLinkForPdf(pdf);
+          lessonAppendices.push([
+            lessonNumber ? `📘 **Ngày ${lessonNumber} — ${lessonDateKey}**` : `📘 **Bài học — ${lessonDateKey}**`,
+            lessonLink ? `🔗 [Mở bài học trên VLearn](${lessonLink})` : '',
+          ].filter(Boolean).join('\n'));
+        } else {
+          missingLessons += 1;
+          const missingLesson = `Mình không có dữ liệu bài học đúng ngày ${lessonDateKey}.`;
+          sourceParts.push(`Bài học ngày ${lessonDateKey}: không có PDF đúng ngày trong dữ liệu được phép.`);
+          groundedFallbackParts.push(missingLesson);
+          console.error('lesson_not_found', lessonDateKey, config.lessonPdfDir);
+        }
       }
     }
     if (asksSchedule && config.discord.announcementChannelId) {
@@ -136,34 +196,48 @@ client.on(Events.MessageCreate, async (message) => {
       && (/tóm tắt|nội dung|đã nói|trình bày/i.test(question) || asksQa || workshopNumbersFromText(question).length > 0)
       && !/\b(lịch|mấy giờ|khi nào|có workshop không)\b/i.test(question);
     if (asksWorkshopContent) {
-      const explicitNumbers = workshopNumbersFromText(question);
-      const transcriptNumbers = explicitNumbers.length
-        ? explicitNumbers
-        : announcedWorkshopNumbers.length
-          ? [...new Set(announcedWorkshopNumbers)]
-          : asksQa ? Object.keys(WORKSHOPS).map(Number) : [];
+      const transcriptNumbers = workshopNumbersForContent(question, announcedWorkshopNumbers);
       for (const workshop of transcriptNumbers.map(loadWorkshop)) {
         const source = asksQa
           ? findWorkshopQaSource(workshop, question)
           : buildWorkshopSummarySource(workshop);
-        if (source) sourceParts.push(`${workshop.label}${asksQa ? ' — hỏi đáp theo chủ đề' : ' — nội dung trình bày'}:\n${source}`);
+        if (source) {
+          sourceParts.push(`${workshop.label}${asksQa ? ' — hỏi đáp theo chủ đề' : ' — nội dung trình bày'}:\n${source}`);
+          const fallback = buildLocalWorkshopFallback(workshop, asksQa ? source : '');
+          groundedFallbackParts.push(fallback);
+          if (!asksQa) workshopSummaryTargets.push({ workshop, source, fallback });
+        }
       }
     }
     let answer;
-    try {
-      answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
-      if (/^Mình chưa tìm thấy (?:bài học|lịch|PDF)/i.test(answer) && groundedFallbackParts.length) {
+    if (workshopSummaryTargets.length && !requestsLessonContent && !asksQa) {
+      const summaries = [];
+      for (const { workshop, source, fallback } of workshopSummaryTargets) {
+        try {
+          const summary = await summarizeWorkshop(source, workshop.label);
+          summaries.push(`**${workshop.label}**\n${summary || fallback}`);
+        } catch (error) {
+          console.error('workshop_summary_failed', workshop.number, error?.code || error?.name || 'UNKNOWN');
+          summaries.push(fallback);
+        }
+      }
+      answer = summaries.join('\n\n').slice(0, 1900);
+    } else if (missingLessons > 0 && foundLessons === 0 && !asksWorkshop && !asksSchedule) {
+      answer = groundedFallbackParts.join('\n\n');
+    } else {
+      try {
+        answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
+        if (/^Mình (?:chưa tìm thấy|chưa thể tạo)/i.test(answer) && groundedFallbackParts.length) {
+          answer = groundedFallbackParts.join('\n\n');
+        }
+      } catch (error) {
+        console.error('learning_answer_failed', error?.code || error?.name || 'UNKNOWN');
+        if (!groundedFallbackParts.length) throw error;
         answer = groundedFallbackParts.join('\n\n');
       }
-    } catch (error) {
-      console.error('learning_answer_failed', error?.code || error?.name || 'UNKNOWN');
-      if (!groundedFallbackParts.length) throw error;
-      answer = groundedFallbackParts.join('\n\n');
     }
-    if (asksLesson && (lessonNumber || lessonLink)) {
-      const lessonMeta = lessonNumber ? `📘 **Ngày ${lessonNumber} — ${dateKey(lessonDate)}**` : '';
-      const lessonUrl = lessonLink ? `🔗 [Mở bài học trên VLearn](${lessonLink})` : '';
-      const appendix = `\n\n${[lessonMeta, lessonUrl].filter(Boolean).join('\n')}`;
+    if (lessonAppendices.length) {
+      const appendix = `\n\n${lessonAppendices.join('\n')}`;
       answer = `${answer.slice(0, 1900 - appendix.length)}${appendix}`;
     }
     await message.reply({ content: answer, allowedMentions: { repliedUser: false, parse: [] } });

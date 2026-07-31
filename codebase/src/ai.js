@@ -2,6 +2,8 @@ import { config } from './config.js';
 import { redactPii } from './privacy.js';
 import { prompts } from './prompts.js';
 
+const workshopSummaryCache = new Map();
+
 function extractJson(text) {
   if (!text || typeof text !== 'string') throw new Error('Response không hợp lệ');
   const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '');
@@ -125,11 +127,14 @@ export async function answerFromLearningSources(question, sources) {
 
 export async function summarizeWorkshop(source, label) {
   if (!source.trim()) return '';
+  if (workshopSummaryCache.has(label)) return workshopSummaryCache.get(label);
   const prompt = prompts.summarizeWorkshop(label, source);
-  const answer = redactPii(await callText(prompt, 650)).slice(0, 1200);
-  return validateWorkshopOutput(answer, source)
+  const answer = redactPii(await callText(prompt, 500)).slice(0, 700);
+  const result = validateWorkshopOutput(answer, source)
     ? answer
     : 'Mình chưa thể tạo tóm tắt có trích dẫn Workshop hợp lệ lúc này.';
+  if (!result.startsWith('Mình chưa thể')) workshopSummaryCache.set(label, result);
+  return result;
 }
 
 export async function summarizeWorkshopDaily(source, label) {

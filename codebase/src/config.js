@@ -86,7 +86,7 @@ export const config = Object.freeze({
   },
   ai: {
     apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
+    model: process.env.OPENAI_MODEL || 'gpt-5.6-terra',
     timeoutMs: int('AI_TIMEOUT_MS', 30000, 5000, 60000),
   },
   pixelPet: {
