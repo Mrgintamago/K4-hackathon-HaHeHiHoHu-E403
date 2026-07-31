@@ -34,6 +34,18 @@ test('bỏ qua hội thoại không phải standup hoặc thiếu trường', ()
   assert.equal(parseStandup('✅ Stand-up đã ghi nhận\nHôm qua\nx'), null);
 });
 
+test('nhận form Daily có tiêu đề khác nhưng vẫn đủ trường', () => {
+  const raw = `Daily Standup đã hoàn thành
+T003 — <@12345678901234567> đã nộp daily stand-up.
+Hôm qua
+hoàn thiện parser
+Hôm nay
+kiểm thử bot
+Blocker
+Không có`;
+  assert.equal(parseStandup(raw)?.userId, '12345678901234567');
+});
+
 test('parse số nhóm G và số team T khi có trong Standup', () => {
   const raw = `✅ Stand-up đã ghi nhận
 <@12345678901234567> G-3 T-369

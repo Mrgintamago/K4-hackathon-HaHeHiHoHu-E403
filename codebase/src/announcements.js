@@ -103,3 +103,32 @@ export async function fetchDailyEvents(channel, roleIds, wantedDateKey) {
       candidate.dateKey === event.dateKey && candidate.type === event.type && candidate.time === event.time) === index)
     .slice(0, 10);
 }
+
+export async function fetchWeeklyEvents(channel, roleIds, referenceDate, timezone = 'Asia/Ho_Chi_Minh') {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const local = formatter.formatToParts(referenceDate)
+    .reduce((parts, item) => ({ ...parts, [item.type]: item.value }), {});
+  const noon = new Date(`${local.year}-${local.month}-${local.day}T12:00:00+07:00`);
+  const monday = new Date(noon);
+  monday.setDate(noon.getDate() + (noon.getDay() === 0 ? -6 : 1 - noon.getDay()));
+  const wanted = new Set(Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + offset);
+    return key(date);
+  }));
+
+  const messages = await channel.messages.fetch({ limit: 100 });
+  const events = [];
+  for (const message of messages.values()) {
+    if (!await authorHasManagerRole(message, roleIds)) continue;
+    events.push(...extractEvents(message.content, message.createdAt));
+  }
+  return events
+    .filter((event) => wanted.has(event.dateKey))
+    .filter((event, index, all) => all.findIndex((candidate) =>
+      candidate.dateKey === event.dateKey && candidate.type === event.type && candidate.time === event.time) === index)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+    .slice(0, 20);
+}

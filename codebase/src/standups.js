@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -11,8 +12,9 @@ import {
 import { config } from './config.js';
 import { redactPii } from './privacy.js';
 
-const stateFile = path.resolve('data-private/standup-state.json');
-const actionLogFile = path.resolve('data-private/standup-action-log.json');
+const codebaseDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const stateFile = path.join(codebaseDir, 'data-private/standup-state.json');
+const actionLogFile = path.join(codebaseDir, 'data-private/standup-action-log.json');
 let logWriteQueue = Promise.resolve();
 
 function localDateKey(date = new Date()) {
@@ -28,7 +30,7 @@ function messageText(message) {
 
 export function parseStandup(raw) {
   const text = String(raw || '').replace(/\r/g, '').replace(/[*_#]/g, '');
-  if (!/✅\s*Stand-up đã ghi nhận/i.test(text)) return null;
+  if (!/(?:✅\s*)?(?:Daily\s+)?Stand-?up\s+(?:đã\s+)?(?:ghi nhận|hoàn thành|được gửi|đã nộp)|đã nộp\s+(?:daily\s+)?stand-?up/i.test(text)) return null;
   const userId = text.match(/<@!?(\d{17,20})>/)?.[1];
   const team = text.match(/\b[tT]-?(\d{2,6})\b/)?.[1];
   const group = text.match(/\b[gG]-?(\d{1,6})\b/)?.[1];
@@ -96,7 +98,12 @@ export async function sendTeamStandups(client, date = new Date()) {
   let sent = 0;
   const submittedUserIds = new Set();
   let guild = null;
-  for (const [team, channelId] of config.discord.standupChannelMap) {
+  const sourceChannels = new Map(config.discord.standupChannelMap);
+  if (config.discord.announcementChannelId
+    && ![...sourceChannels.values()].includes(config.discord.announcementChannelId)) {
+    sourceChannels.set('', config.discord.announcementChannelId);
+  }
+  for (const [team, channelId] of sourceChannels) {
     const channel = await client.channels.fetch(channelId);
     if (!channel?.isTextBased()) continue;
     guild ||= channel.guild || null;
@@ -333,13 +340,14 @@ export function startStandupReminder(client) {
     const scheduleKey = `${day}@${String(config.standupHour).padStart(2, '0')}:${String(config.standupMinute).padStart(2, '0')}`;
     const current = value('hour') * 60 + value('minute');
     const scheduled = config.standupHour * 60 + config.standupMinute;
-    if (current < scheduled || lastSent === scheduleKey) return;
+    // Chấp nhận cả state cũ chỉ lưu ngày để restart không gửi lại trong ngày nâng cấp.
+    if (current < scheduled || lastSent === scheduleKey || lastSent === day) return;
     const sent = await sendTeamStandups(client, now);
     if (!sent) return;
     lastSent = scheduleKey;
     let state = {};
     try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { /* Chưa có state. */ }
-    state._lastReminder = day;
+    state._lastReminder = scheduleKey;
     state._sentAt = new Date().toISOString();
     state._sentCount = sent;
     fs.mkdirSync(path.dirname(stateFile), { recursive: true });

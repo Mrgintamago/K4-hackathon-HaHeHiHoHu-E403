@@ -68,7 +68,7 @@ export const config = Object.freeze({
   },
   ai: {
     apiKey: process.env.OPENAI_API_KEY || '',
-    model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+    model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
     timeoutMs: int('AI_TIMEOUT_MS', 30000, 5000, 60000),
   },
   transcriptDir: path.resolve(process.env.TRANSCRIPT_DIR || '../../data/vlearn-pack/transcript'),

@@ -21,8 +21,11 @@ test('parse được marker thường, marker bold và chấp nhận mã lặp',
 test('nhận diện số workshop từ câu hỏi hoặc thông báo', () => {
   assert.deepEqual(workshopNumbersFromText('Workshop 02 bắt đầu lúc 20:00'), [2]);
   assert.deepEqual(workshopNumbersFromText('tóm tắt WS1 và workshop 2'), [1, 2]);
+  assert.deepEqual(workshopNumbersFromText('tóm tắt w s 2'), [2]);
+  assert.deepEqual(workshopNumbersFromText('nội dung w.s-1'), [1]);
   assert.equal(isWorkshopQuery('WS2 có câu hỏi nào về FinTech?'), true);
   assert.equal(isWorkshopQuery('ws 1 nói về gì?'), true);
+  assert.equal(isWorkshopQuery('tóm tắt w s 2'), true);
   assert.equal(isWorkshopQuery('bài PDF hôm nay'), false);
 });
 

@@ -6,7 +6,7 @@ import { safeQuestion } from './privacy.js';
 import { startDailyReminder } from './reminders.js';
 import { handleStandupButton, startStandupReminder } from './standups.js';
 import { findLessonPdf, readFirstPages } from './lessons.js';
-import { fetchDailyEvents } from './announcements.js';
+import { fetchDailyEvents, fetchWeeklyEvents } from './announcements.js';
 import { acquireInstanceLock } from './single-instance.js';
 import { classifyQuery, LESSON_PATTERN, requestedDate, SCHEDULE_PATTERN } from './query-intents.js';
 import {
@@ -81,9 +81,10 @@ client.on(Events.MessageCreate, async (message) => {
     const sourceParts = [];
     const announcedWorkshopNumbers = [];
     const asksWorkshop = isWorkshopQuery(question);
-    const { asksLesson, asksSchedule } = classifyQuery(question);
+    const { asksLesson, asksSchedule, asksWeeklySchedule } = classifyQuery(question);
     const lessonDate = requestedDate(question, LESSON_PATTERN);
     const scheduleDate = requestedDate(question, SCHEDULE_PATTERN);
+    let groundedFallback = '';
     if (asksLesson || (!asksWorkshop && !asksSchedule)) {
       const pdf = findLessonPdf(config.lessonPdfDir, lessonDate, config.reminderTimezone);
       if (pdf) sourceParts.push(`Nội dung 3 trang đầu PDF bài học ngày ${dateKey(lessonDate)}:\n${await readFirstPages(pdf)}`);
@@ -92,13 +93,26 @@ client.on(Events.MessageCreate, async (message) => {
       try {
         const channel = await client.channels.fetch(config.discord.announcementChannelId);
         const events = channel?.isTextBased()
-          ? await fetchDailyEvents(channel, config.discord.managerRoleIds, dateKey(scheduleDate)) : [];
+          ? asksWeeklySchedule
+            ? await fetchWeeklyEvents(channel, config.discord.managerRoleIds, scheduleDate, config.reminderTimezone)
+            : await fetchDailyEvents(channel, config.discord.managerRoleIds, dateKey(scheduleDate))
+          : [];
         if (events.length) {
-          sourceParts.push(`Lịch chính thức ngày ${dateKey(scheduleDate)}:\n${events
-            .map((event) => `${event.time ? `${event.time} — ` : ''}${event.type}: ${event.description}`)
-            .join('\n')}`);
+          const eventLines = events.map((event) =>
+            `${event.dateKey}${event.time ? ` ${event.time}` : ''} — ${event.type}: ${event.description}`);
+          const heading = asksWeeklySchedule
+            ? `Lịch chính thức trong tuần chứa ngày ${dateKey(scheduleDate)}`
+            : `Lịch chính thức ngày ${dateKey(scheduleDate)}`;
+          sourceParts.push(`${heading}:\n${eventLines.join('\n')}`);
+          groundedFallback = `Theo thông báo chính thức, ${heading.toLowerCase()}:\n${eventLines
+            .map((line) => `• ${line}`)
+            .join('\n')}`.slice(0, 1900);
         } else if (channel?.isTextBased()) {
-          sourceParts.push(`Lịch chính thức ngày ${dateKey(scheduleDate)}: không tìm thấy sự kiện phù hợp trong thông báo được phép.`);
+          const scope = asksWeeklySchedule
+            ? `tuần chứa ngày ${dateKey(scheduleDate)}`
+            : `ngày ${dateKey(scheduleDate)}`;
+          sourceParts.push(`Lịch chính thức ${scope}: không tìm thấy sự kiện phù hợp trong thông báo được phép.`);
+          groundedFallback = `Mình chưa tìm thấy sự kiện trong thông báo chính thức cho ${scope}.`;
         }
         const workshops = events.filter((event) => event.type === 'Workshop');
         if (workshops.length) {
@@ -124,7 +138,14 @@ client.on(Events.MessageCreate, async (message) => {
         if (source) sourceParts.push(`${workshop.label}${asksQa ? ' — hỏi đáp theo chủ đề' : ' — nội dung trình bày'}:\n${source}`);
       }
     }
-    const answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
+    let answer;
+    try {
+      answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
+    } catch (error) {
+      console.error('learning_answer_failed', error?.code || error?.name || 'UNKNOWN');
+      if (!groundedFallback) throw error;
+      answer = groundedFallback;
+    }
     await message.reply({ content: answer, allowedMentions: { repliedUser: false, parse: [] } });
   } catch {
     console.error('mention_qa_failed');

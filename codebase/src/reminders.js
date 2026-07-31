@@ -1,10 +1,13 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { findLessonPdf, readFirstPages, dayDates } from './lessons.js';
 import { summarizeLessonPage, summarizeWorkshopDaily } from './ai.js';
 import { fetchDailyEvents } from './announcements.js';
 import { buildWorkshopSummarySource, loadWorkshop } from './workshops.js';
+
+const codebaseDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function dateKey(date) {
   return new Intl.DateTimeFormat('en-GB', {
@@ -88,7 +91,7 @@ export async function buildDailyReminder(client, now = new Date()) {
 }
 
 export function startDailyReminder(client) {
-  const stateFile = path.resolve('data-private/reminder-state.json');
+  const stateFile = path.join(codebaseDir, 'data-private/reminder-state.json');
   let lastSent = '';
   try { lastSent = JSON.parse(fs.readFileSync(stateFile, 'utf8')).lastSent || ''; } catch { /* Chưa có state. */ }
   const check = async () => {

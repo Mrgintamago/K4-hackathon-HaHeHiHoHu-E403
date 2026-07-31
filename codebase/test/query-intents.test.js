@@ -11,6 +11,15 @@ test('nhận diện đồng thời câu hỏi bài học và lịch Workshop', (
   assert.deepEqual(classifyQuery('Hôm qua học bài nào, hôm nay có lịch workshop không?'), {
     asksLesson: true,
     asksSchedule: true,
+    asksWeeklySchedule: false,
+  });
+});
+
+test('nhận diện câu hỏi lịch hàng tuần', () => {
+  assert.deepEqual(classifyQuery('Các buổi tối hàng tuần sẽ có những lịch gì?'), {
+    asksLesson: false,
+    asksSchedule: true,
+    asksWeeklySchedule: true,
   });
 });
 

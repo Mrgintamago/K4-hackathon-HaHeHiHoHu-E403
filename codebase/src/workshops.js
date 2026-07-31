@@ -131,12 +131,12 @@ export function findWorkshopQaSource(workshop, query, maxChars = 14000) {
 }
 
 export function workshopNumbersFromText(value) {
-  const matches = [...String(value || '').matchAll(/\b(?:workshop|ws)\s*0?([12])\b/gi)];
+  const matches = [...String(value || '').matchAll(/\b(?:workshop|w[\s._-]*s)[\s._-]*0?([12])\b/gi)];
   return [...new Set(matches.map((match) => Number(match[1])))];
 }
 
 export function isWorkshopQuery(value) {
-  return /\bworkshop\b|\bws\s*\d*\b/i.test(String(value || ''));
+  return /\bworkshop\b|\bw[\s._-]*s(?:\s*\d+)?\b/i.test(String(value || ''));
 }
 
 export function loadRelevantWorkshops(value) {
