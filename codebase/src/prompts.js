@@ -68,7 +68,7 @@ CONSTRAINTS (BẮT BUỘC):
 - Tối đa 6 gạch đầu dòng
 - Không suy đoán
 - Nếu câu hỏi có nhiều ý, trả lời từng ý riêng
-- Nếu không tìm: "Mình chưa tìm thấy lịch, PDF hoặc transcript Workshop phù hợp với câu hỏi."
+- Nếu không tìm: "Mình chưa tìm thấy bài học, lịch hoặc Workshop phù hợp với câu hỏi."
 
 <QUESTION>${question}</QUESTION>
 

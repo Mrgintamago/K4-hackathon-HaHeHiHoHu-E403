@@ -25,6 +25,30 @@ export function findLessonPdf(directory, date, timeZone) {
   return filePath;
 }
 
+export function lessonLinkForPdf(filePath, listPath = path.join(path.dirname(filePath), 'list.md')) {
+  const match = path.basename(filePath).match(FILE_RE);
+  if (!match || !fs.existsSync(listPath)) return '';
+  const lessonKey = match[4].trim().toLocaleLowerCase('vi');
+  for (const line of fs.readFileSync(listPath, 'utf8').split(/\r?\n/)) {
+    const entry = line.match(/^\s*([^:#]+)\s*:\s*(https:\/\/\S+)\s*$/i);
+    if (entry?.[1].trim().toLocaleLowerCase('vi') === lessonKey) {
+      try {
+        const url = new URL(entry[2]);
+        return url.protocol === 'https:' ? url.toString() : '';
+      } catch {
+        return '';
+      }
+    }
+  }
+  return '';
+}
+
+export function lessonNumberForPdf(filePath) {
+  const match = path.basename(filePath).match(FILE_RE);
+  const lesson = match?.[4].trim().match(/^ngay[\s._-]*0?(\d{1,3})$/i);
+  return lesson ? Number(lesson[1]) : null;
+}
+
 export async function readFirstPages(filePath, maxPages = 3) {
   const bytes = new Uint8Array(fs.readFileSync(filePath));
   const pdf = await getDocument({ data: bytes, disableFontFace: true, useSystemFonts: false }).promise;

@@ -3,9 +3,9 @@ import { assertEnv, config } from './config.js';
 import { answerFromLearningSources } from './ai.js';
 import { acquire, release } from './security.js';
 import { safeQuestion } from './privacy.js';
-import { startDailyReminder } from './reminders.js';
+import { localLessonSummary, startDailyReminder } from './reminders.js';
 import { handleStandupButton, startStandupReminder } from './standups.js';
-import { findLessonPdf, readFirstPages } from './lessons.js';
+import { findLessonPdf, lessonLinkForPdf, lessonNumberForPdf, readFirstPages } from './lessons.js';
 import { fetchDailyEvents, fetchWeeklyEvents } from './announcements.js';
 import { acquireInstanceLock } from './single-instance.js';
 import { classifyQuery, LESSON_PATTERN, requestedDate, SCHEDULE_PATTERN } from './query-intents.js';
@@ -84,10 +84,21 @@ client.on(Events.MessageCreate, async (message) => {
     const { asksLesson, asksSchedule, asksWeeklySchedule } = classifyQuery(question);
     const lessonDate = requestedDate(question, LESSON_PATTERN);
     const scheduleDate = requestedDate(question, SCHEDULE_PATTERN);
-    let groundedFallback = '';
+    const groundedFallbackParts = [];
+    let lessonLink = '';
+    let lessonNumber = null;
     if (asksLesson || (!asksWorkshop && !asksSchedule)) {
       const pdf = findLessonPdf(config.lessonPdfDir, lessonDate, config.reminderTimezone);
-      if (pdf) sourceParts.push(`Nội dung 3 trang đầu PDF bài học ngày ${dateKey(lessonDate)}:\n${await readFirstPages(pdf)}`);
+      if (pdf) {
+        lessonNumber = lessonNumberForPdf(pdf);
+        const lessonLabel = lessonNumber ? `Ngày học ${lessonNumber}, ngày ${dateKey(lessonDate)}` : `Bài học ngày ${dateKey(lessonDate)}`;
+        const firstPages = await readFirstPages(pdf);
+        sourceParts.push(`${lessonLabel} — nội dung 3 trang đầu:\n${firstPages}`);
+        groundedFallbackParts.push(`**${lessonLabel}**\n${localLessonSummary(firstPages)} _(tóm tắt cục bộ)_`);
+        lessonLink = lessonLinkForPdf(pdf);
+      } else {
+        console.error('lesson_not_found', dateKey(lessonDate), config.lessonPdfDir);
+      }
     }
     if (asksSchedule && config.discord.announcementChannelId) {
       try {
@@ -104,15 +115,15 @@ client.on(Events.MessageCreate, async (message) => {
             ? `Lịch chính thức trong tuần chứa ngày ${dateKey(scheduleDate)}`
             : `Lịch chính thức ngày ${dateKey(scheduleDate)}`;
           sourceParts.push(`${heading}:\n${eventLines.join('\n')}`);
-          groundedFallback = `Theo thông báo chính thức, ${heading.toLowerCase()}:\n${eventLines
+          groundedFallbackParts.push(`Theo thông báo chính thức, ${heading.toLowerCase()}:\n${eventLines
             .map((line) => `• ${line}`)
-            .join('\n')}`.slice(0, 1900);
+            .join('\n')}`);
         } else if (channel?.isTextBased()) {
           const scope = asksWeeklySchedule
             ? `tuần chứa ngày ${dateKey(scheduleDate)}`
             : `ngày ${dateKey(scheduleDate)}`;
           sourceParts.push(`Lịch chính thức ${scope}: không tìm thấy sự kiện phù hợp trong thông báo được phép.`);
-          groundedFallback = `Mình chưa tìm thấy sự kiện trong thông báo chính thức cho ${scope}.`;
+          groundedFallbackParts.push(`Mình chưa tìm thấy sự kiện trong thông báo chính thức cho ${scope}.`);
         }
         const workshops = events.filter((event) => event.type === 'Workshop');
         if (workshops.length) {
@@ -141,10 +152,19 @@ client.on(Events.MessageCreate, async (message) => {
     let answer;
     try {
       answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
+      if (/^Mình chưa tìm thấy (?:bài học|lịch|PDF)/i.test(answer) && groundedFallbackParts.length) {
+        answer = groundedFallbackParts.join('\n\n');
+      }
     } catch (error) {
       console.error('learning_answer_failed', error?.code || error?.name || 'UNKNOWN');
-      if (!groundedFallback) throw error;
-      answer = groundedFallback;
+      if (!groundedFallbackParts.length) throw error;
+      answer = groundedFallbackParts.join('\n\n');
+    }
+    if (asksLesson && (lessonNumber || lessonLink)) {
+      const lessonMeta = lessonNumber ? `📘 **Ngày ${lessonNumber} — ${dateKey(lessonDate)}**` : '';
+      const lessonUrl = lessonLink ? `🔗 [Mở bài học trên VLearn](${lessonLink})` : '';
+      const appendix = `\n\n${[lessonMeta, lessonUrl].filter(Boolean).join('\n')}`;
+      answer = `${answer.slice(0, 1900 - appendix.length)}${appendix}`;
     }
     await message.reply({ content: answer, allowedMentions: { repliedUser: false, parse: [] } });
   } catch {

@@ -38,20 +38,19 @@ export function localLessonSummary(text) {
 
 async function lessonLine(label, date) {
   const file = findLessonPdf(config.lessonPdfDir, date, config.reminderTimezone);
-  if (!file) return `• ${label}: không có PDF bài học đúng định dạng.`;
-  const fileLabel = path.basename(file, '.pdf').split('-')[0];
+  if (!file) return `• ${label}: chưa có nội dung bài học được công bố.`;
   try {
     const firstPages = await readFirstPages(file);
     try {
       const summary = await summarizeLessonPage(firstPages);
-      return `• ${label} (${fileLabel}): ${summary || localLessonSummary(firstPages)}`;
+      return `• ${label}: ${summary || localLessonSummary(firstPages)}`;
     } catch (error) {
       console.error('lesson_summary_ai_failed', error?.name || 'UNKNOWN');
-      return `• ${label} (${fileLabel}): ${localLessonSummary(firstPages)} _(tóm tắt cục bộ)_`;
+      return `• ${label}: ${localLessonSummary(firstPages)} _(tóm tắt cục bộ)_`;
     }
   } catch (error) {
     console.error('lesson_pdf_read_failed', error?.name || 'UNKNOWN');
-    return `• ${label} (${fileLabel}): chưa thể đọc trang đầu PDF.`;
+    return `• ${label}: chưa thể đọc nội dung bài học.`;
   }
 }
 
@@ -90,6 +89,12 @@ export async function buildDailyReminder(client, now = new Date()) {
   return lines.join('\n').slice(0, 1950);
 }
 
+export function reminderDestinationChannelIds(reminderChannelId, userPersonalChannelMap) {
+  return reminderChannelId
+    ? new Set([reminderChannelId])
+    : new Set(userPersonalChannelMap.values());
+}
+
 export function startDailyReminder(client) {
   const stateFile = path.join(codebaseDir, 'data-private/reminder-state.json');
   let lastSent = '';
@@ -106,8 +111,10 @@ export function startDailyReminder(client) {
     const scheduled = config.reminderHour * 60 + config.reminderMinute;
     if (current < scheduled || lastSent === scheduleKey) return;
     const content = await buildDailyReminder(client);
-    const channelIds = config.discord.userPersonalChannelMap.size
-      ? new Set(config.discord.userPersonalChannelMap.values()) : new Set([config.discord.reminderChannelId]);
+    const channelIds = reminderDestinationChannelIds(
+      config.discord.reminderChannelId,
+      config.discord.userPersonalChannelMap,
+    );
     let sent = 0;
     for (const channelId of channelIds) {
       const channel = await client.channels.fetch(channelId);

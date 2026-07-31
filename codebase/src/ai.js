@@ -115,7 +115,7 @@ export async function answerFromTranscripts(question, sources) {
 }
 
 export async function answerFromLearningSources(question, sources) {
-  if (!sources.trim()) return 'Mình chưa tìm thấy lịch, PDF hoặc transcript Workshop phù hợp với câu hỏi.';
+  if (!sources.trim()) return 'Mình chưa tìm thấy bài học, lịch hoặc Workshop phù hợp với câu hỏi.';
   const prompt = prompts.answerFromLearningSources(question, sources);
   const answer = redactPii(await callText(prompt, 900)).slice(0, 1900);
   return validateWorkshopOutput(answer, sources)

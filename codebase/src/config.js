@@ -1,5 +1,14 @@
-import 'dotenv/config';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+
+const codebaseDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(codebaseDir, '.env') });
+
+function configuredPath(value, fallbackRelative) {
+  const selected = String(value || fallbackRelative).trim();
+  return path.isAbsolute(selected) ? path.normalize(selected) : path.resolve(codebaseDir, selected);
+}
 
 const int = (name, fallback, min, max) => {
   const value = Number(process.env[name] || fallback);
@@ -71,8 +80,8 @@ export const config = Object.freeze({
     model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
     timeoutMs: int('AI_TIMEOUT_MS', 30000, 5000, 60000),
   },
-  transcriptDir: path.resolve(process.env.TRANSCRIPT_DIR || '../../data/vlearn-pack/transcript'),
-  lessonPdfDir: path.resolve(process.env.LESSON_PDF_DIR || '../pdf'),
+  transcriptDir: configuredPath(process.env.TRANSCRIPT_DIR, '../../data/vlearn-pack/transcript'),
+  lessonPdfDir: configuredPath(process.env.LESSON_PDF_DIR, '../pdf'),
   maxContextChars: int('MAX_CONTEXT_CHARS', 130000, 10000, 160000),
   rateLimitMs: int('RATE_LIMIT_SECONDS', 30, 5, 300) * 1000,
   mentionQaEnabled: bool('ENABLE_MENTION_QA', false),

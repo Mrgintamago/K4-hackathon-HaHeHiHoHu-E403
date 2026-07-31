@@ -126,7 +126,7 @@ REMINDER_MINUTE=0
 REMINDER_TIMEZONE=Asia/Ho_Chi_Minh
 ```
 
-Nếu không dùng `USER_PERSONAL_CHANNEL_MAP`, có thể cấu hình một `DISCORD_REMINDER_CHANNEL_ID`. Khi daily reminder được bật, bot yêu cầu channel thông báo và ít nhất một manager role.
+Khi cấu hình `DISCORD_REMINDER_CHANNEL_ID`, thông báo học tập hằng ngày được gửi vào channel chung này. Nếu để trống, bot mới dùng các channel trong `USER_PERSONAL_CHANNEL_MAP`. Reminder Standup vẫn dùng channel cá nhân. Khi daily reminder được bật, bot yêu cầu channel nguồn thông báo và ít nhất một manager role.
 
 ## Bật Daily Standup
 
