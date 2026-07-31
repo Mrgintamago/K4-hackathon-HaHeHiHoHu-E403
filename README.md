@@ -19,8 +19,11 @@ Prototype hackathon hỗ trợ học tập trực tiếp trong Discord. Bot tr�
 - Trả lời câu hỏi về bài học dựa trên PDF, không suy đoán khi thiếu nguồn.
 - Đọc lịch Workshop từ channel thông báo; chỉ tin nội dung của manager role.
 - Gửi reminder gồm bài hôm qua, bài hôm nay và lịch trong ngày.
+- Khi thông báo ghi rõ `Workshop 1` hoặc `Workshop 2`, daily reminder thêm tóm tắt nội dung giảng viên và các chủ đề hỏi đáp cuối buổi từ transcript private.
+- Có thể mention bot để hỏi nội dung hoặc Q&A theo chủ đề, ví dụ `@bot WS2 có câu hỏi nào về FinTech/KYC?`.
 - Đọc Daily Standup theo team và gửi card có nút cập nhật trạng thái tới channel cá nhân.
 - Che PII trước khi gửi câu hỏi hoặc nội dung tài liệu tới AI.
+- Che lại PII trên output AI trước khi gửi Discord; transcript chỉ được truy hồi theo đoạn liên quan và không được commit.
 - Rate limit theo user và khóa single-instance để tránh chạy trùng bot.
 
 Bot **không đăng ký slash command**. Script `npm run deploy` chỉ xóa các guild command cũ đã từng được deploy.

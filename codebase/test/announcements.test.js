@@ -6,6 +6,7 @@ test('trích lịch ngày tuyệt đối', () => {
   const events = extractEvents('WORKSHOP 3\nThời gian: 20:00 ngày 30/07/2026\nNội dung: MVP', new Date('2026-07-27'));
   assert.equal(events[0].dateKey, '30.07.2026');
   assert.equal(events[0].type, 'Workshop');
+  assert.equal(events[0].workshopNumber, 3);
 });
 
 test('ưu tiên giờ có nhãn Thời gian thay vì timestamp đầu message', () => {
@@ -20,4 +21,5 @@ test('trích từng lịch theo thứ trong thông báo tuần', () => {
   assert.deepEqual(events.map((event) => [event.dateKey, event.type]), [
     ['29.07.2026', 'Mentor duty'], ['30.07.2026', 'Workshop'],
   ]);
+  assert.equal(events[1].workshopNumber, 3);
 });

@@ -16,6 +16,11 @@ function eventType(text) {
       : /workshop|\bWS\s*\d/i.test(text) ? 'Workshop' : null;
 }
 
+function workshopNumber(text) {
+  const match = String(text || '').match(/\b(?:workshop|WS)\s*0?([1-9]\d*)\b/i);
+  return match ? Number(match[1]) : null;
+}
+
 function weeklyDate(messageDate, discordDay) {
   const date = new Date(messageDate);
   date.setHours(12, 0, 0, 0);
@@ -56,6 +61,7 @@ export function extractEvents(content, messageDate = new Date()) {
     events.push({
       dateKey: key(weeklyDate(messageDate, discordDay)),
       type,
+      workshopNumber: type === 'Workshop' ? workshopNumber(block) : null,
       time: time ? `${String(time[1]).padStart(2, '0')}:${time[2] || '00'}` : '',
       description: detail.slice(0, 180),
     });
@@ -75,6 +81,7 @@ export function extractEvents(content, messageDate = new Date()) {
     events.push({
       dateKey: key(date),
       type,
+      workshopNumber: type === 'Workshop' ? workshopNumber(nearby) || workshopNumber(safe) : null,
       time: time ? `${String(time[1]).padStart(2, '0')}:${time[2] || '00'}` : '',
       description: (detail || `${type} theo thông báo của chương trình.`).slice(0, 180),
     });

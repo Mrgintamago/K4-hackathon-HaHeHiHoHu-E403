@@ -8,6 +8,14 @@ import { handleStandupButton, startStandupReminder } from './standups.js';
 import { findLessonPdf, readFirstPage } from './lessons.js';
 import { fetchDailyEvents } from './announcements.js';
 import { acquireInstanceLock } from './single-instance.js';
+import {
+  buildWorkshopSummarySource,
+  findWorkshopQaSource,
+  isWorkshopQuery,
+  loadWorkshop,
+  WORKSHOPS,
+  workshopNumbersFromText,
+} from './workshops.js';
 
 acquireInstanceLock();
 assertEnv();
@@ -51,7 +59,8 @@ client.on(Events.MessageCreate, async (message) => {
     if (!question) return await message.reply('Bạn hãy hỏi về lịch hoặc nội dung PDF bài học.');
     const date = requestedDate(question);
     const sourceParts = [];
-    const asksWorkshop = /workshop|\bws\b/i.test(question);
+    const announcedWorkshopNumbers = [];
+    const asksWorkshop = isWorkshopQuery(question);
     const asksLesson = /bài|học|pdf|hôm nay|hôm qua/i.test(question) && !asksWorkshop;
     if (asksLesson || !asksWorkshop) {
       const pdf = findLessonPdf(config.lessonPdfDir, date, config.reminderTimezone);
@@ -63,8 +72,26 @@ client.on(Events.MessageCreate, async (message) => {
         const events = channel?.isTextBased()
           ? await fetchDailyEvents(channel, config.discord.managerRoleIds, dateKey(date)) : [];
         const workshops = events.filter((event) => event.type === 'Workshop');
-        if (workshops.length) sourceParts.push(`Nội dung/mô tả Workshop ngày ${dateKey(date)}:\n${workshops.map((e) => e.description).join('\n')}`);
+        if (workshops.length) {
+          sourceParts.push(`Nội dung/mô tả Workshop ngày ${dateKey(date)}:\n${workshops.map((e) => e.description).join('\n')}`);
+          announcedWorkshopNumbers.push(...workshops.map((event) => event.workshopNumber).filter((number) => WORKSHOPS[number]));
+        }
       } catch { console.error('announcement_read_failed'); }
+    }
+    if (asksWorkshop) {
+      const asksQa = /hỏi|câu hỏi|q\s*&\s*a|qa|thắc mắc|chủ đề/i.test(question);
+      const explicitNumbers = workshopNumbersFromText(question);
+      const transcriptNumbers = explicitNumbers.length
+        ? explicitNumbers
+        : announcedWorkshopNumbers.length
+          ? [...new Set(announcedWorkshopNumbers)]
+          : asksQa ? Object.keys(WORKSHOPS).map(Number) : [];
+      for (const workshop of transcriptNumbers.map(loadWorkshop)) {
+        const source = asksQa
+          ? findWorkshopQaSource(workshop, question)
+          : buildWorkshopSummarySource(workshop);
+        if (source) sourceParts.push(`${workshop.label}${asksQa ? ' — hỏi đáp theo chủ đề' : ' — nội dung trình bày'}:\n${source}`);
+      }
     }
     const answer = await answerFromLearningSources(question, sourceParts.join('\n\n'));
     await message.reply({ content: answer, allowedMentions: { repliedUser: false, parse: [] } });
@@ -74,4 +101,16 @@ client.on(Events.MessageCreate, async (message) => {
   } finally { release(message.author.id); }
 });
 
-client.login(config.discord.token);
+async function loginWithRetry(attempt = 1) {
+  try {
+    await client.login(config.discord.token);
+  } catch (error) {
+    const code = error?.code || error?.cause?.code || 'UNKNOWN';
+    const retryMs = Math.min(60_000, 5_000 * (2 ** Math.min(attempt - 1, 4)));
+    console.error('discord_login_failed', code, `retry_in_ms=${retryMs}`);
+    try { client.destroy(); } catch { /* Client chưa kết nối hoàn chỉnh. */ }
+    setTimeout(() => loginWithRetry(attempt + 1), retryMs);
+  }
+}
+
+loginWithRetry();

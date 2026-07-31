@@ -21,6 +21,13 @@ Copy-Item .env.example .env
 `MENTION_ALLOWED_CHANNEL_IDS`, và bật **Message Content Intent** trong Discord
 Developer Portal. Đặt `LESSON_PDF_DIR` tới thư mục PDF private.
 
+Để dùng tóm tắt Workshop 1/2 và hỏi đáp theo chủ đề, đặt `TRANSCRIPT_DIR` tới thư
+mục private chứa `workshop01_transcript.md` và `workshop02_transcript.md`. Daily
+reminder chỉ hiển thị Workshop 2 là hôm qua; Workshop 1 vẫn là nguồn để hỏi qua
+mention.
+Ví dụ mention: `@bot tóm tắt Workshop 2` hoặc
+`@bot WS2 có câu hỏi nào về FinTech và KYC?`.
+
 ## 2. Kiểm tra trước khi chạy
 
 ```powershell
