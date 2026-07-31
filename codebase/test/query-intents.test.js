@@ -34,3 +34,8 @@ test('ngày tuyệt đối được ưu tiên', () => {
   const date = requestedDate('Ngày 30.07.2026 học bài nào?', LESSON_PATTERN, new Date('2026-07-31'));
   assert.match(date.toISOString(), /^2026-07-30/);
 });
+
+test('ngày tuyệt đối không có năm dùng năm hiện tại', () => {
+  const date = requestedDate('Tóm tắt bài 30/7', LESSON_PATTERN, new Date('2026-07-31T05:00:00Z'));
+  assert.match(date.toISOString(), /^2026-07-30/);
+});

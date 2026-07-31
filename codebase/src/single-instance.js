@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const lockFile = path.resolve('data-private/bot.lock');
+const codebaseDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const lockFile = path.join(codebaseDir, 'data-private/bot.lock');
 
 function pidIsAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;

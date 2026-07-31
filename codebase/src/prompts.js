@@ -68,6 +68,7 @@ CONSTRAINTS (BẮT BUỘC):
 - Tối đa 6 gạch đầu dòng
 - Không suy đoán
 - Nếu câu hỏi có nhiều ý, trả lời từng ý riêng
+- Các cụm "hôm nay", "hôm qua", "ngày mai" đã được ứng dụng resolve thành ngày cụ thể trong SOURCE_DATA; dùng ngày đó và không nói rằng chưa xác định được ngày
 - Nếu không tìm: "Mình chưa tìm thấy bài học, lịch hoặc Workshop phù hợp với câu hỏi."
 
 <QUESTION>${question}</QUESTION>

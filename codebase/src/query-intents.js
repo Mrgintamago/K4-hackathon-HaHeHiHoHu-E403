@@ -3,8 +3,17 @@ export const SCHEDULE_PATTERN = /\b(lịch|workshop|office\s*hours?|mentor\s*dut
 export const WEEKLY_PATTERN = /\b(hàng tuần|trong tuần|tuần này|lịch tuần)\b/i;
 
 export function requestedDate(question, intentPattern = null, now = new Date()) {
-  const explicit = String(question || '').match(/\b(\d{2})[./-](\d{2})[./-](\d{4})\b/);
-  if (explicit) return new Date(`${explicit[3]}-${explicit[2]}-${explicit[1]}T12:00:00+07:00`);
+  const explicit = String(question || '').match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}))?\b/);
+  if (explicit) {
+    const currentYear = Number(new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric',
+    }).format(now));
+    const day = Number(explicit[1]);
+    const month = Number(explicit[2]);
+    const year = Number(explicit[3] || currentYear);
+    const date = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00+07:00`);
+    if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) return date;
+  }
   const relevant = intentPattern
     ? String(question || '').split(/[,.?!;\n]+/).find((part) => intentPattern.test(part)) || question
     : question;
