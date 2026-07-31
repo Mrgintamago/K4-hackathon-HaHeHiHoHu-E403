@@ -15,11 +15,11 @@ Prototype hackathon hỗ trợ học tập trực tiếp trong Discord. Bot tr�
 ## Tính năng hiện tại
 
 - Hỏi bot bằng mention trong các channel được allowlist.
-- Tìm PDF theo ngày từ tên file `dd.mm.yyyy-*.pdf` và chỉ đọc trang đầu.
+- Tìm PDF theo ngày từ tên file `dd.mm.yyyy-*.pdf` và chỉ đọc tối đa 3 trang đầu.
 - Trả lời câu hỏi về bài học dựa trên PDF, không suy đoán khi thiếu nguồn.
 - Đọc lịch Workshop từ channel thông báo; chỉ tin nội dung của manager role.
 - Gửi reminder gồm bài hôm qua, bài hôm nay và lịch trong ngày.
-- Khi thông báo ghi rõ `Workshop 1` hoặc `Workshop 2`, daily reminder thêm tóm tắt nội dung giảng viên và các chủ đề hỏi đáp cuối buổi từ transcript private.
+- Daily reminder thêm tóm tắt Workshop 2 của hôm qua; Workshop 1/2 vẫn dùng được cho mention Q&A từ transcript private.
 - Có thể mention bot để hỏi nội dung hoặc Q&A theo chủ đề, ví dụ `@bot WS2 có câu hỏi nào về FinTech/KYC?`.
 - Đọc Daily Standup theo team và gửi card có nút cập nhật trạng thái tới channel cá nhân.
 - Che PII trước khi gửi câu hỏi hoặc nội dung tài liệu tới AI.
@@ -34,7 +34,7 @@ Bot **không đăng ký slash command**. Script `npm run deploy` chỉ xóa các
 Discord mention
     -> kiểm tra guild, channel, role và rate limit
     -> xác định ngày/nội dung được hỏi
-    -> đọc trang đầu PDF và/hoặc lịch Workshop đáng tin cậy
+    -> đọc tối đa 3 trang đầu PDF và/hoặc lịch Workshop đáng tin cậy
     -> che dữ liệu cá nhân
     -> OpenAI Responses API (store: false)
     -> reply trong channel, không cho phép mention phát sinh
@@ -51,7 +51,7 @@ Các module chính:
 | `codebase/src/bot.js` | Discord event handlers và luồng mention Q&A |
 | `codebase/src/config.js` | Đọc và kiểm tra cấu hình environment |
 | `codebase/src/ai.js` | Gọi OpenAI Responses API |
-| `codebase/src/lessons.js` | Tìm PDF theo ngày và đọc trang đầu |
+| `codebase/src/lessons.js` | Tìm PDF theo ngày và đọc tối đa 3 trang đầu |
 | `codebase/src/announcements.js` | Trích lịch từ thông báo đáng tin cậy |
 | `codebase/src/reminders.js` | Daily learning reminder |
 | `codebase/src/standups.js` | Parse, gửi và cập nhật Daily Standup |
@@ -110,6 +110,10 @@ RATE_LIMIT_SECONDS=30
 
 Để `ALLOWED_ROLE_IDS` trống nếu mọi member trong guild đều được dùng bot.
 
+Channel denylist và guild khác bị bỏ qua hoàn toàn. Mention ngoài channel allowlist hoặc
+thiếu role nhận thông báo cố định, không đọc nguồn và không gọi AI. Nếu bot thiếu quyền
+gửi tin nhắn, bot chỉ ghi log lỗi tổng quát.
+
 ## Bật daily reminder
 
 ```env
@@ -129,13 +133,20 @@ Nếu không dùng `USER_PERSONAL_CHANNEL_MAP`, có thể cấu hình một `DIS
 ```env
 ENABLE_STANDUP_REMINDER=true
 TEAM_STANDUP_CHANNEL_MAP=T203:111111111111111111,T204:222222222222222222
+TEAM_STANDUP_GROUP_MAP=T203:G1,T204:G1
 USER_PERSONAL_CHANNEL_MAP=123456789012345678:333333333333333333
 STANDUP_REMINDER_HOUR=21
 STANDUP_REMINDER_MINUTE=30
 STANDUP_MANAGER_ROLE_IDS=444444444444444444
 ```
 
-Bot đọc message có tiêu đề `✅ Stand-up đã ghi nhận`, parse các mục `Hôm qua`, `Hôm nay`, `Blocker`, rồi gửi card tới channel cá nhân. Chỉ chủ standup hoặc manager được cập nhật trạng thái. Raw standup không được gửi tới AI hoặc lưu vào state.
+Bot đọc message có tiêu đề `✅ Stand-up đã ghi nhận`, parse các mục `Hôm qua`, `Hôm nay`,
+`Blocker`, rồi gửi card tới channel cá nhân. Chỉ chủ standup hoặc manager được cập nhật
+trạng thái. `Đã làm`/`Chưa xong` được ghi ngay; `Có blocker` bắt buộc nhập blocker mới
+qua modal. Lịch sử riêng tư được lưu tại `data-private/standup-action-log.json` theo cây
+`G-số nhóm → T-số team → user`. Raw standup không được gửi tới AI hoặc ghi vào action log.
+User có trong `USER_PERSONAL_CHANNEL_MAP` nhưng chưa gửi Standup trong ngày sẽ nhận card
+nhắc “Chưa ghi nhận Daily Standup” tại channel cá nhân.
 
 ## Kiểm tra và chạy
 

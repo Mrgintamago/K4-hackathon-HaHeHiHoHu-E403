@@ -25,17 +25,24 @@ export function findLessonPdf(directory, date, timeZone) {
   return filePath;
 }
 
-export async function readFirstPage(filePath) {
+export async function readFirstPages(filePath, maxPages = 3) {
   const bytes = new Uint8Array(fs.readFileSync(filePath));
   const pdf = await getDocument({ data: bytes, disableFontFace: true, useSystemFonts: false }).promise;
   try {
-    const page = await pdf.getPage(1);
-    const content = await page.getTextContent();
-    return redactPii(content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim()).slice(0, 12000);
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= Math.min(maxPages, pdf.numPages); pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const text = content.items.map((item) => item.str || '').join(' ').replace(/\s+/g, ' ').trim();
+      pages.push(`[Trang ${pageNumber}] ${text}`);
+    }
+    return redactPii(pages.join('\n')).slice(0, 30000);
   } finally {
     await pdf.destroy();
   }
 }
+
+export const readFirstPage = readFirstPages;
 
 export function dayDates(now = new Date()) {
   return { today: now, yesterday: new Date(now.getTime() - 24 * 60 * 60 * 1000) };

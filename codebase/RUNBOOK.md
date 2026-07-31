@@ -20,6 +20,7 @@ Copy-Item .env.example .env
 Để hỏi bằng mention, bật `ENABLE_MENTION_QA=true`, khai báo
 `MENTION_ALLOWED_CHANNEL_IDS`, và bật **Message Content Intent** trong Discord
 Developer Portal. Đặt `LESSON_PDF_DIR` tới thư mục PDF private.
+Bot đọc tối đa 3 trang đầu của đúng một PDF khớp ngày.
 
 Để dùng tóm tắt Workshop 1/2 và hỏi đáp theo chủ đề, đặt `TRANSCRIPT_DIR` tới thư
 mục private chứa `workshop01_transcript.md` và `workshop02_transcript.md`. Daily
@@ -27,6 +28,11 @@ reminder chỉ hiển thị Workshop 2 là hôm qua; Workshop 1 vẫn là nguồ
 mention.
 Ví dụ mention: `@bot tóm tắt Workshop 2` hoặc
 `@bot WS2 có câu hỏi nào về FinTech và KYC?`.
+
+Với Daily Standup, cấu hình `TEAM_STANDUP_GROUP_MAP` để ánh xạ team sang nhóm, ví dụ
+`T369:G3`. Khi user chọn trạng thái, bot ghi lịch sử private theo
+`G-3 → T-369 → tên user`. Chọn `Có blocker` sẽ mở modal bắt buộc nhập blocker mới.
+Log nằm tại `data-private/standup-action-log.json`, không commit và không gửi tới AI.
 
 ## 2. Kiểm tra trước khi chạy
 
@@ -66,6 +72,8 @@ Các lỗi thường gặp:
 
 - `Thiếu ...`: biến bắt buộc chưa có trong `.env`.
 - Mention không phản hồi: kiểm tra Message Content Intent, guild ID và channel allowlist.
+- Mention ngoài allowlist hoặc thiếu role: bot trả thông báo cố định mà không gọi AI;
+  denylist vẫn im lặng.
 - Không tìm thấy bài: kiểm tra `LESSON_PDF_DIR` và tiền tố ngày `dd.mm.yyyy-`.
 - `Bot đã chạy ở PID ...`: dừng instance cũ trước khi khởi động instance mới.
 

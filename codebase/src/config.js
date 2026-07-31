@@ -40,6 +40,16 @@ function teamChannelMap(name) {
   return map;
 }
 
+function teamGroupMap(name) {
+  const map = new Map();
+  for (const item of (process.env[name] || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    const match = item.match(/^([A-Za-z0-9_-]{1,20}):(G-?\d{1,6})$/i);
+    if (!match) throw new Error(`${name} phải có dạng TEAM:G-SO_NHOM`);
+    map.set(match[1].toUpperCase(), `G${match[2].replace(/\D/g, '')}`);
+  }
+  return map;
+}
+
 export const config = Object.freeze({
   discord: {
     token: process.env.DISCORD_TOKEN || '',
@@ -52,6 +62,7 @@ export const config = Object.freeze({
     announcementChannelId: snowflake('DISCORD_ANNOUNCEMENT_CHANNEL_ID'),
     reminderChannelId: snowflake('DISCORD_REMINDER_CHANNEL_ID'),
     standupChannelMap: teamChannelMap('TEAM_STANDUP_CHANNEL_MAP'),
+    standupGroupMap: teamGroupMap('TEAM_STANDUP_GROUP_MAP'),
     userPersonalChannelMap: teamChannelMap('USER_PERSONAL_CHANNEL_MAP'),
     standupManagerRoleIds: snowflakeSet('STANDUP_MANAGER_ROLE_IDS'),
   },
