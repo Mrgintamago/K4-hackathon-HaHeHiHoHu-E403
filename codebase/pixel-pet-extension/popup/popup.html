@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Pixel Pet</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><img src="../assets/pet.svg" alt=""><div><h1>Pixel Pet</h1><p id="pet-status">Đang thức</p></div></header>
+  <section class="connection"><span id="status-dot"></span><div><strong id="connection-label">Đang kiểm tra…</strong><small id="endpoint"></small></div></section>
+  <p class="unread"><strong id="unread-count">0</strong> thông báo chưa đọc</p>
+  <section><h2>Mới nhất</h2><ol id="history"></ol></section>
+  <div class="actions"><button id="reconnect">Kết nối lại</button><button id="mark-read">Đánh dấu đã đọc</button></div>
+  <fieldset>
+    <label><input id="native" type="checkbox"> Native notification</label>
+    <label><input id="bubbles" type="checkbox"> Bong bóng trên web</label>
+    <label><input id="sounds" type="checkbox"> Âm thanh</label>
+    <label><input id="visible" type="checkbox"> Hiện pet</label>
+  </fieldset>
+  <button id="settings" class="settings">⚙ Mở cài đặt</button>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

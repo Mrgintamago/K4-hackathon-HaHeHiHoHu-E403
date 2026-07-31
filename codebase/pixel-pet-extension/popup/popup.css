@@ -1,0 +1,17 @@
+:root { color-scheme: light; font-family: ui-monospace, "Cascadia Mono", monospace; color: #242038; background: #fff7d6; }
+* { box-sizing: border-box; }
+body { width: 360px; margin: 0; padding: 16px; }
+header { display: flex; align-items: center; gap: 12px; border-bottom: 4px solid #242038; padding-bottom: 10px; }
+header img { width: 58px; image-rendering: pixelated; } h1, h2, p { margin: 0; } h1 { font-size: 20px; } h2 { font-size: 14px; margin: 14px 0 8px; }
+.connection { display: flex; gap: 9px; align-items: center; margin: 14px 0; padding: 10px; background: white; border: 3px solid #242038; }
+#status-dot { width: 14px; height: 14px; background: #ef476f; border: 2px solid #242038; } #status-dot.online { background: #06d6a0; }
+small { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.unread { background: #ffd166; padding: 8px; border: 2px solid #242038; }
+ol { list-style: none; padding: 0; margin: 0; max-height: 190px; overflow: auto; }
+li { background: white; border: 2px solid #242038; padding: 8px; margin-bottom: 6px; } li p { margin-top: 4px; font-size: 12px; }
+.actions, fieldset { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+fieldset { border: 0; padding: 0; font-size: 12px; }
+button { border: 3px solid #242038; background: #06d6a0; padding: 8px; font: inherit; cursor: pointer; box-shadow: 3px 3px 0 #242038; }
+button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 #242038; }
+button:focus-visible, input:focus-visible { outline: 3px solid #ef476f; outline-offset: 2px; }
+.settings { width: 100%; margin-top: 12px; background: #ffd166; }

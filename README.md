@@ -1,5 +1,13 @@
 # HaHeHiHoHu — Discord Learning Assistant
 
+## Pixel Pet Notifier (optional)
+
+Repo có thêm Chromium Manifest V3 extension và FastAPI local server để đẩy daily reminder từ bot ra một pixel pet trên trang web. Tính năng mặc định tắt và không ảnh hưởng Discord bot.
+
+- Extension: `codebase/pixel-pet-extension/README.md`
+- Local server: `codebase/local-server/README.md`
+- Rollback checkpoint: branch `backup/pre-pixel-pet-20260731`, commit `74b0aa2`
+
 Prototype hackathon hỗ trợ học tập trực tiếp trong Discord. Bot trả lời câu hỏi về bài học từ PDF private, đọc lịch Workshop từ channel thông báo, gửi daily reminder và chuyển Daily Standup tới channel cá nhân.
 
 ## Thành viên và phân công

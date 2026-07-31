@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Pixel Pet Settings</title><link rel="stylesheet" href="options.css"></head>
+<body>
+<main>
+  <header><img src="../assets/pet.svg" alt=""><div><h1>Pixel Pet Settings</h1><p>Local-first · Không đọc nội dung trang web</p></div></header>
+  <form id="form">
+    <section><h2>Kết nối</h2>
+      <label>WebSocket URL<input name="websocketUrl" type="url" required></label>
+      <label>Polling URL<input name="pollingUrl" type="url" required></label>
+      <label>Health URL<input name="healthUrl" type="url" required></label>
+      <label>Polling (phút)<input name="pollingIntervalMinutes" type="number" min="0.5" max="60" step="0.5"></label>
+      <label>Shared token<input name="authToken" type="password" autocomplete="new-password"></label>
+      <label class="check"><input name="allowLanHost" type="checkbox"> Cho phép host LAN tin cậy <strong>(cảnh báo: chỉ bật trên mạng an toàn)</strong></label>
+    </section>
+    <section><h2>Pet và thông báo</h2>
+      <label>Kích thước pet<input name="petSize" type="range" min="48" max="128"><output id="pet-size"></output></label>
+      <label>Tốc độ animation<input name="animationSpeed" type="range" min="0.25" max="2" step="0.25"></label>
+      <label>Âm lượng<input name="soundVolume" type="range" min="0" max="1" step="0.1"></label>
+      <label>Tự đóng (giây)<input name="autoDismissSeconds" type="number" min="3" max="120"></label>
+      <label class="check"><input name="nativeNotifications" type="checkbox"> Native notifications</label>
+      <label class="check"><input name="speechBubbles" type="checkbox"> Speech bubbles</label>
+      <label class="check"><input name="sounds" type="checkbox"> Sounds</label>
+      <label class="check"><input name="petVisible" type="checkbox"> Hiện pet</label>
+      <label class="check"><input name="animationsPaused" type="checkbox"> Tạm dừng animation</label>
+      <label class="check"><input name="urgentSticky" type="checkbox"> Giữ urgent/high đến khi đóng</label>
+      <label class="check"><input name="confirmExternalUrls" type="checkbox"> Xác nhận URL ngoài localhost</label>
+    </section>
+    <section><h2>Website bị tắt</h2><label>Mỗi domain một dòng<textarea name="disabledSites" rows="5" placeholder="example.com"></textarea></label></section>
+    <section><h2>Debug</h2><label class="check"><input name="debug" type="checkbox"> Bật debug mode</label></section>
+    <p id="message" role="status"></p>
+    <div class="buttons"><button type="submit">Lưu cài đặt</button><button type="button" id="reset">Reset</button></div>
+  </form>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

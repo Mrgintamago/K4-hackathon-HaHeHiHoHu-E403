@@ -33,6 +33,15 @@ const bool = (name, fallback = false) => {
   return value.toLowerCase() === 'true';
 };
 
+function localHttpUrl(name, fallback) {
+  const value = process.env[name] || fallback;
+  const url = new URL(value);
+  if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+    throw new Error(`${name} phải là HTTP URL localhost`);
+  }
+  return url.toString();
+}
+
 const snowflake = (name) => {
   const value = (process.env[name] || '').trim();
   if (value && !/^\d{17,20}$/.test(value)) throw new Error(`${name} không phải Discord ID hợp lệ`);
@@ -80,10 +89,15 @@ export const config = Object.freeze({
     model: process.env.OPENAI_MODEL || 'gpt-5.6-sol',
     timeoutMs: int('AI_TIMEOUT_MS', 30000, 5000, 60000),
   },
+  pixelPet: {
+    enabled: bool('ENABLE_PIXEL_PET_NOTIFIER', false),
+    notificationUrl: localHttpUrl('PIXEL_PET_NOTIFICATION_URL', 'http://localhost:8765/api/notifications'),
+    token: process.env.PIXEL_PET_TOKEN || '',
+  },
   transcriptDir: configuredPath(process.env.TRANSCRIPT_DIR, '../../data/vlearn-pack/transcript'),
   lessonPdfDir: configuredPath(process.env.LESSON_PDF_DIR, '../pdf'),
   maxContextChars: int('MAX_CONTEXT_CHARS', 130000, 10000, 160000),
-  rateLimitMs: int('RATE_LIMIT_SECONDS', 30, 5, 300) * 1000,
+  rateLimitMs: int('RATE_LIMIT_SECONDS', 5, 5, 300) * 1000,
   mentionQaEnabled: bool('ENABLE_MENTION_QA', false),
   dailyReminderEnabled: bool('ENABLE_DAILY_REMINDER', false),
   reminderHour: int('REMINDER_HOUR', 8, 0, 23),
@@ -109,6 +123,9 @@ export function assertEnv({ ai = true } = {}) {
   }
   if (config.mentionQaEnabled && !config.discord.mentionAllowedChannelIds.size) {
     throw new Error('Phải cấu hình MENTION_ALLOWED_CHANNEL_IDS khi bật mention Q&A');
+  }
+  if (config.mentionQaEnabled && !config.discord.allowedRoleIds.size) {
+    throw new Error('Phải cấu hình ALLOWED_ROLE_IDS bằng ID role Learner khi bật mention Q&A');
   }
   if (config.dailyReminderEnabled) {
     if (!config.discord.userPersonalChannelMap.size && !config.discord.reminderChannelId) throw new Error('Thiếu USER_PERSONAL_CHANNEL_MAP');

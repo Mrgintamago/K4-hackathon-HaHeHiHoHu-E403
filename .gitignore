@@ -1,6 +1,11 @@
 .env
 node_modules/
 venv/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+pixel-pet-extension.zip
 logs/
 data-private/
 *.log

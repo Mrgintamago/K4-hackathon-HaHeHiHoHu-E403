@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Pixel Pet Notifier",
+  "version": "1.0.0",
+  "description": "A local-first pixel pet for reminders from your Discord learning bot.",
+  "permissions": ["storage", "notifications", "alarms"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Pixel Pet Notifier"
+  },
+  "options_page": "options/options.html",
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content/content-script.js"],
+    "run_at": "document_idle"
+  }],
+  "web_accessible_resources": [{
+    "resources": ["content/*.js", "content/styles.css", "shared/*.js", "assets/pet.svg"],
+    "matches": ["http://*/*", "https://*/*"]
+  }]
+}

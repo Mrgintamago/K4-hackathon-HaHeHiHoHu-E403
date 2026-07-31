@@ -6,6 +6,7 @@ import { findLessonPdf, readFirstPages, dayDates } from './lessons.js';
 import { summarizeLessonPage, summarizeWorkshopDaily } from './ai.js';
 import { fetchDailyEvents } from './announcements.js';
 import { buildWorkshopSummarySource, loadWorkshop } from './workshops.js';
+import { publishPixelPetNotification } from './pixel-pet.js';
 
 const codebaseDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -124,6 +125,12 @@ export function startDailyReminder(client) {
       }
     }
     if (!sent) return;
+    await publishPixelPetNotification({
+      title: 'Nhắc học tập hằng ngày',
+      message: content,
+      type: 'reminder',
+      priority: 'high',
+    });
     lastSent = scheduleKey;
     fs.mkdirSync(path.dirname(stateFile), { recursive: true });
     fs.writeFileSync(stateFile, JSON.stringify({ lastSent, sentAt: new Date().toISOString(), sentCount: sent }), { encoding: 'utf8', mode: 0o600 });
